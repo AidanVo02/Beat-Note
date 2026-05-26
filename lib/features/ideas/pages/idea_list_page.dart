@@ -4,7 +4,6 @@ import '../../../core/models/idea.dart';
 import '../idea_repository.dart';
 import '../widgets/empty_state.dart';
 import 'idea_detail_page.dart';
-import 'idea_editor_page.dart';
 
 class IdeaListPage extends StatefulWidget {
   const IdeaListPage({super.key});
@@ -66,7 +65,7 @@ class _IdeaListPageState extends State<IdeaListPage> {
       body: ideas.isEmpty
           ? EmptyState(
               hasQuery: _searchController.text.trim().isNotEmpty,
-              onCreatePressed: _createIdea,
+              onCreatePressed: _quickCreateNote,
             )
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
@@ -94,22 +93,68 @@ class _IdeaListPageState extends State<IdeaListPage> {
               itemCount: ideas.length,
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _createIdea,
-        tooltip: 'New idea',
+        onPressed: _quickCreateNote,
+        tooltip: 'New note',
         child: const Icon(Icons.add_rounded),
       ),
     );
   }
 
-  Future<void> _createIdea() async {
-    // --- Navigate: create new idea ---
+  Future<void> _quickCreateNote() async {
+    // --- Action: quick-create empty idea, jump to note ---
     _dismissKeyboard();
-    final created = await Navigator.of(context).push<Idea?>(
-      MaterialPageRoute(builder: (_) => const IdeaEditorPage()),
+
+    final now = DateTime.now();
+    final draft = Idea(
+      id: now.microsecondsSinceEpoch.toString(),
+      title: '',
+      note: '',
+      bpm: null,
+      musicKey: null,
+      mood: null,
+      tags: const [],
+      recordings: const [],
+      createdAt: now,
+      updatedAt: now,
     );
-    if (created == null) return;
-    setState(() => _repo.upsert(created));
+
+    _repo.upsert(draft);
     await _repo.save();
+
+    if (!mounted) return;
+    setState(() {});
+
+    final changed = await Navigator.of(context).push<bool?>(
+      MaterialPageRoute(
+        builder: (_) => IdeaDetailPage(
+          ideaId: draft.id,
+          repo: _repo,
+          startEditingNote: true,
+        ),
+      ),
+    );
+
+    if (changed == true) {
+      setState(() {});
+    }
+
+    final created = _repo.getById(draft.id);
+    if (created != null && _isIdeaEmpty(created)) {
+      _repo.delete(created.id);
+      await _repo.save();
+      if (!mounted) return;
+      setState(() {});
+    }
+  }
+
+  bool _isIdeaEmpty(Idea idea) {
+    return idea.title.trim().isEmpty &&
+        idea.note.trim().isEmpty &&
+        idea.bpm == null &&
+        (idea.musicKey == null || idea.musicKey!.trim().isEmpty) &&
+        (idea.mood == null || idea.mood!.trim().isEmpty) &&
+        idea.tags.isEmpty &&
+        idea.recordings.isEmpty;
   }
 
   Future<void> _openIdea(String id) async {

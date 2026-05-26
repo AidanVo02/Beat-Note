@@ -8,10 +8,16 @@ import '../../recordings/audio_recorder_controller.dart';
 import 'idea_editor_page.dart';
 
 class IdeaDetailPage extends StatefulWidget {
-  const IdeaDetailPage({super.key, required this.ideaId, required this.repo});
+  const IdeaDetailPage({
+    super.key,
+    required this.ideaId,
+    required this.repo,
+    this.startEditingNote = false,
+  });
 
   final String ideaId;
   final IdeaRepository repo;
+  final bool startEditingNote;
 
   @override
   State<IdeaDetailPage> createState() => _IdeaDetailPageState();
@@ -35,6 +41,7 @@ class _IdeaDetailPageState extends State<IdeaDetailPage> {
     _recorder = AudioRecorderController();
     _player = AudioPlayerController();
     _noteController = TextEditingController();
+    _isEditingNote = widget.startEditingNote;
   }
 
   @override
@@ -129,7 +136,7 @@ class _IdeaDetailPageState extends State<IdeaDetailPage> {
           const SizedBox(height: 8),
           if (idea.recordings.isEmpty)
             Text(
-              'No recordings yet. Tap “Record 10s” to capture a reference clip.',
+              'No recordings yet. Tap "Record 10s" to capture a reference clip.',
               style: Theme.of(context).textTheme.bodyMedium,
             )
           else
@@ -382,6 +389,7 @@ class _NoteSection extends StatelessWidget {
             const SizedBox(height: 8),
             TextField(
               controller: noteController,
+              autofocus: true,
               minLines: 6,
               maxLines: 14,
               decoration: const InputDecoration(
