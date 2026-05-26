@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'recording.dart';
+
 @immutable
 class Idea {
   const Idea({
@@ -10,6 +12,7 @@ class Idea {
     required this.musicKey,
     required this.mood,
     required this.tags,
+    required this.recordings,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -21,6 +24,7 @@ class Idea {
   final String? musicKey;
   final String? mood;
   final List<String> tags;
+  final List<Recording> recordings;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -41,6 +45,7 @@ class Idea {
     String? musicKey,
     String? mood,
     List<String>? tags,
+    List<Recording>? recordings,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -52,6 +57,7 @@ class Idea {
       musicKey: musicKey ?? this.musicKey,
       mood: mood ?? this.mood,
       tags: tags ?? this.tags,
+      recordings: recordings ?? this.recordings,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -66,6 +72,7 @@ class Idea {
       'musicKey': musicKey,
       'mood': mood,
       'tags': tags,
+      'recordings': recordings.map((r) => r.toJson()).toList(growable: false),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -80,6 +87,11 @@ class Idea {
       musicKey: json['musicKey'] as String?,
       mood: json['mood'] as String?,
       tags: (json['tags'] as List?)?.whereType<String>().toList() ?? const [],
+      recordings: (json['recordings'] as List?)
+              ?.whereType<Map>()
+              .map((m) => Recording.fromJson(m.cast<String, Object?>()))
+              .toList(growable: false) ??
+          const [],
       createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
       updatedAt: DateTime.tryParse((json['updatedAt'] as String?) ?? '') ??
@@ -87,4 +99,3 @@ class Idea {
     );
   }
 }
-

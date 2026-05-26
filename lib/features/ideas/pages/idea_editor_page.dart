@@ -14,36 +14,62 @@ class IdeaEditorPage extends StatefulWidget {
 class _IdeaEditorPageState extends State<IdeaEditorPage> {
   late final Idea _draft;
   late final TextEditingController _title;
-  late final TextEditingController _note;
   late final TextEditingController _bpm;
-  late final TextEditingController _key;
   late final TextEditingController _mood;
   late final TextEditingController _tags;
+  String? _selectedKey;
+
+  static const List<String> _musicKeys = [
+    'C',
+    'C#',
+    'D',
+    'D#',
+    'E',
+    'F',
+    'F#',
+    'G',
+    'G#',
+    'A',
+    'A#',
+    'B',
+    'Cm',
+    'C#m',
+    'Dm',
+    'D#m',
+    'Em',
+    'Fm',
+    'F#m',
+    'Gm',
+    'G#m',
+    'Am',
+    'A#m',
+    'Bm',
+  ];
 
   @override
+  // --- Screen lifecycle: init controllers from draft ---
   void initState() {
     super.initState();
     _draft = widget.draft ?? _newDraft();
     _title = TextEditingController(text: _draft.title);
-    _note = TextEditingController(text: _draft.note);
     _bpm = TextEditingController(text: _draft.bpm?.toString() ?? '');
-    _key = TextEditingController(text: _draft.musicKey ?? '');
     _mood = TextEditingController(text: _draft.mood ?? '');
     _tags = TextEditingController(text: _draft.tags.join(', '));
+    _selectedKey = _draft.musicKey;
   }
 
   @override
+  // --- Screen lifecycle: dispose controllers ---
   void dispose() {
     _title.dispose();
-    _note.dispose();
     _bpm.dispose();
-    _key.dispose();
     _mood.dispose();
     _tags.dispose();
     super.dispose();
   }
 
   @override
+  // --- UI: create/edit idea metadata ---
   Widget build(BuildContext context) {
     final isEdit = widget.draft != null;
 
@@ -69,17 +95,6 @@ class _IdeaEditorPageState extends State<IdeaEditorPage> {
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _note,
-            minLines: 6,
-            maxLines: 14,
-            decoration: const InputDecoration(
-              labelText: 'Note',
-              alignLabelWithHint: true,
-              hintText: 'Write lyrics, chords, structure, references...',
-            ),
-          ),
-          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -95,13 +110,15 @@ class _IdeaEditorPageState extends State<IdeaEditorPage> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: TextField(
-                  controller: _key,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Key',
-                    hintText: 'e.g. C#m',
-                  ),
+                child: DropdownMenu<String>(
+                  label: const Text('Key'),
+                  hintText: 'Select a key',
+                  expandedInsets: EdgeInsets.zero,
+                  initialSelection: _selectedKey,
+                  dropdownMenuEntries: _musicKeys
+                      .map((k) => DropdownMenuEntry<String>(value: k, label: k))
+                      .toList(growable: false),
+                  onSelected: (v) => setState(() => _selectedKey = v),
                 ),
               ),
             ],
@@ -147,6 +164,7 @@ class _IdeaEditorPageState extends State<IdeaEditorPage> {
   }
 
   Idea _newDraft() {
+    // --- Helper: create new empty draft idea ---
     final now = DateTime.now();
     return Idea(
       id: now.microsecondsSinceEpoch.toString(),
@@ -156,12 +174,14 @@ class _IdeaEditorPageState extends State<IdeaEditorPage> {
       musicKey: null,
       mood: null,
       tags: const [],
+      recordings: const [],
       createdAt: now,
       updatedAt: now,
     );
   }
 
   void _save() {
+    // --- Action: save idea metadata and return to previous screen ---
     final bpm = int.tryParse(_bpm.text.trim());
     final now = DateTime.now();
     final tags = _tags.text
@@ -173,15 +193,15 @@ class _IdeaEditorPageState extends State<IdeaEditorPage> {
 
     final idea = _draft.copyWith(
       title: _title.text.trim(),
-      note: _note.text.trim(),
+      note: _draft.note,
       bpm: bpm,
-      musicKey: _key.text.trim().isEmpty ? null : _key.text.trim(),
+      musicKey: _selectedKey,
       mood: _mood.text.trim().isEmpty ? null : _mood.text.trim(),
       tags: tags,
+      recordings: _draft.recordings,
       updatedAt: now,
     );
 
     Navigator.of(context).pop(idea);
   }
 }
-

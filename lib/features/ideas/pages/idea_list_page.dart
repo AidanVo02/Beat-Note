@@ -16,14 +16,28 @@ class IdeaListPage extends StatefulWidget {
 class _IdeaListPageState extends State<IdeaListPage> {
   final IdeaRepository _repo = IdeaRepository();
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   @override
+  // --- Screen lifecycle: load persisted ideas ---
+  void initState() {
+    super.initState();
+    _repo.load().then((_) {
+      if (!mounted) return;
+      setState(() {});
+    });
+  }
+
+  @override
+  // --- Screen lifecycle: dispose controllers ---
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
   @override
+  // --- UI: idea list + search ---
   Widget build(BuildContext context) {
     final ideas = _repo.search(_searchController.text);
 
@@ -36,6 +50,8 @@ class _IdeaListPageState extends State<IdeaListPage> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: SearchBar(
               controller: _searchController,
+              focusNode: _searchFocusNode,
+              autoFocus: false,
               hintText: 'Search title, note, tags...',
               leading: const Icon(Icons.search),
               onChanged: (_) => setState(() {}),
@@ -82,25 +98,37 @@ class _IdeaListPageState extends State<IdeaListPage> {
   }
 
   Future<void> _createIdea() async {
+    // --- Navigate: create new idea ---
+    _dismissKeyboard();
     final created = await Navigator.of(context).push<Idea?>(
       MaterialPageRoute(builder: (_) => const IdeaEditorPage()),
     );
     if (created == null) return;
     setState(() => _repo.upsert(created));
+    await _repo.save();
   }
 
   Future<void> _openIdea(String id) async {
+    // --- Navigate: open idea detail ---
+    _dismissKeyboard();
     final idea = _repo.getById(id);
     if (idea == null) return;
 
-    final updated = await Navigator.of(context).push<Idea?>(
+    final changed = await Navigator.of(context).push<bool?>(
       MaterialPageRoute(
         builder: (_) => IdeaDetailPage(ideaId: id, repo: _repo),
       ),
     );
 
-    if (updated == null) return;
-    setState(() => _repo.upsert(updated));
+    if (changed == true) {
+      setState(() {});
+    }
+    _dismissKeyboard();
+  }
+
+  void _dismissKeyboard() {
+    // --- UX helper: dismiss soft keyboard ---
+    _searchFocusNode.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 }
-
