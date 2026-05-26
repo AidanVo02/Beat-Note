@@ -105,9 +105,10 @@ class _IdeaListPageState extends State<IdeaListPage> {
     _dismissKeyboard();
 
     final now = DateTime.now();
+    final title = _nextUntitledTitle();
     final draft = Idea(
       id: now.microsecondsSinceEpoch.toString(),
-      title: '',
+      title: title,
       note: '',
       bpm: null,
       musicKey: null,
@@ -137,24 +138,30 @@ class _IdeaListPageState extends State<IdeaListPage> {
     if (changed == true) {
       setState(() {});
     }
-
-    final created = _repo.getById(draft.id);
-    if (created != null && _isIdeaEmpty(created)) {
-      _repo.delete(created.id);
-      await _repo.save();
-      if (!mounted) return;
-      setState(() {});
-    }
   }
 
-  bool _isIdeaEmpty(Idea idea) {
-    return idea.title.trim().isEmpty &&
-        idea.note.trim().isEmpty &&
-        idea.bpm == null &&
-        (idea.musicKey == null || idea.musicKey!.trim().isEmpty) &&
-        (idea.mood == null || idea.mood!.trim().isEmpty) &&
-        idea.tags.isEmpty &&
-        idea.recordings.isEmpty;
+  String _nextUntitledTitle() {
+    // --- Helper: generate "Untitled", "Untitled 1", "Untitled 2", ... ---
+    final used = <int>{};
+    for (final idea in _repo.search('')) {
+      final t = idea.title.trim();
+      if (t == 'Untitled') {
+        used.add(0);
+        continue;
+      }
+      if (!t.startsWith('Untitled ')) continue;
+      final suffix = t.substring('Untitled '.length).trim();
+      final n = int.tryParse(suffix);
+      if (n == null) continue;
+      used.add(n);
+    }
+
+    if (!used.contains(0)) return 'Untitled';
+    var i = 1;
+    while (used.contains(i)) {
+      i++;
+    }
+    return 'Untitled $i';
   }
 
   Future<void> _openIdea(String id) async {

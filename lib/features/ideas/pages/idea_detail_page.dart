@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/models/idea.dart';
@@ -32,6 +34,7 @@ class _IdeaDetailPageState extends State<IdeaDetailPage> {
   bool _isEditingNote = false;
   bool _isRecording = false;
   String? _recordingPathInProgress;
+  DateTime? _recordingStartedAt;
   String? _playingRecordingId;
 
   @override
@@ -85,7 +88,7 @@ class _IdeaDetailPageState extends State<IdeaDetailPage> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
         children: [
           Wrap(
             spacing: 8,
@@ -126,17 +129,12 @@ class _IdeaDetailPageState extends State<IdeaDetailPage> {
               leading: const Icon(Icons.graphic_eq_rounded),
               title: const Text('Voice memos'),
               subtitle: Text('${idea.recordings.length} recording(s)'),
-              trailing: FilledButton.icon(
-                onPressed: _isRecording ? _stopRecording : _startRecording,
-                icon: Icon(_isRecording ? Icons.stop_rounded : Icons.mic_rounded),
-                label: Text(_isRecording ? 'Stop' : 'Record 10s'),
-              ),
             ),
           ),
           const SizedBox(height: 8),
           if (idea.recordings.isEmpty)
             Text(
-              'No recordings yet. Tap "Record 10s" to capture a reference clip.',
+              'No recordings yet. Hold the mic button to record a reference clip.',
               style: Theme.of(context).textTheme.bodyMedium,
             )
           else
@@ -148,6 +146,12 @@ class _IdeaDetailPageState extends State<IdeaDetailPage> {
                   onRename: () => _renameRecording(r),
                 )),
         ],
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: _HoldToRecordFab(
+        isRecording: _isRecording,
+        onStart: _startRecording,
+        onStop: _stopRecording,
       ),
     );
   }
@@ -181,6 +185,10 @@ class _IdeaDetailPageState extends State<IdeaDetailPage> {
     // --- Action: start mic recording (reference capture) ---
     final idea = _idea;
     if (idea == null) return;
+    if (_isRecording) return;
+
+    await _player.stop();
+    setState(() => _playingRecordingId = null);
 
     final ok = await _recorder.hasPermission();
     if (!ok) {
@@ -195,6 +203,7 @@ class _IdeaDetailPageState extends State<IdeaDetailPage> {
     setState(() {
       _isRecording = true;
       _recordingPathInProgress = path;
+      _recordingStartedAt = DateTime.now();
     });
 
     // Auto stop after 10 seconds.
@@ -209,16 +218,29 @@ class _IdeaDetailPageState extends State<IdeaDetailPage> {
     // --- Action: stop recording and attach to idea ---
     final idea = _idea;
     if (idea == null) return;
+    if (!_isRecording) return;
 
     final savedPath = await _recorder.stopRecording();
     final finalPath = savedPath ?? _recordingPathInProgress;
+    final startedAt = _recordingStartedAt;
+    final endedAt = DateTime.now();
 
     setState(() {
       _isRecording = false;
       _recordingPathInProgress = null;
+      _recordingStartedAt = null;
     });
 
     if (finalPath == null || finalPath.trim().isEmpty) return;
+
+    // If user only tapped quickly, discard super-short clips to avoid noise.
+    if (startedAt != null &&
+        endedAt.difference(startedAt) < const Duration(milliseconds: 300)) {
+      try {
+        await File(finalPath).delete();
+      } catch (_) {}
+      return;
+    }
 
     final now = DateTime.now();
     final takeNumber = idea.recordings.length + 1;
@@ -399,6 +421,43 @@ class _NoteSection extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HoldToRecordFab extends StatelessWidget {
+  const _HoldToRecordFab({
+    required this.isRecording,
+    required this.onStart,
+    required this.onStop,
+  });
+
+  final bool isRecording;
+  final VoidCallback onStart;
+  final VoidCallback onStop;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      // --- Gesture: hold to record, release to stop ---
+      onPointerDown: (_) => onStart(),
+      onPointerUp: (_) => onStop(),
+      onPointerCancel: (_) => onStop(),
+      child: FloatingActionButton(
+        tooltip: 'Hold to record',
+        onPressed: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Hold the mic to record, release to stop.')),
+          );
+        },
+        backgroundColor: isRecording
+            ? Theme.of(context).colorScheme.error
+            : Theme.of(context).colorScheme.primaryContainer,
+        foregroundColor: isRecording
+            ? Theme.of(context).colorScheme.onError
+            : Theme.of(context).colorScheme.onPrimaryContainer,
+        child: Icon(isRecording ? Icons.mic_rounded : Icons.mic_none_rounded),
       ),
     );
   }
