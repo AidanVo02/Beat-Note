@@ -9,6 +9,7 @@ class AppStorage {
   AppStorage();
 
   static const _fileName = 'beatnote_data.json';
+  static const _tmpFileName = 'beatnote_data.json.tmp';
 
   Future<List<Idea>> loadIdeas() async {
     try {
@@ -30,17 +31,28 @@ class AppStorage {
 
   Future<void> saveIdeas(List<Idea> ideas) async {
     final file = await _dataFile();
+    final tmp = await _tmpDataFile();
     final payload = <String, Object?>{
       'schemaVersion': 1,
       'ideas': ideas.map((i) => i.toJson()).toList(growable: false),
       'savedAt': DateTime.now().toIso8601String(),
     };
-    await file.writeAsString(jsonEncode(payload));
+    // Atomic write: write to temp file then rename, to avoid corrupting the
+    // main JSON file if the app is killed during write.
+    await tmp.writeAsString(jsonEncode(payload), flush: true);
+    if (await file.exists()) {
+      await file.delete();
+    }
+    await tmp.rename(file.path);
   }
 
   Future<File> _dataFile() async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}${Platform.pathSeparator}$_fileName');
   }
-}
 
+  Future<File> _tmpDataFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}${Platform.pathSeparator}$_tmpFileName');
+  }
+}

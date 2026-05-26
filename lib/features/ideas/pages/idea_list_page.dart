@@ -17,11 +17,14 @@ class _IdeaListPageState extends State<IdeaListPage> {
   final IdeaRepository _repo = IdeaRepository();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  late final _LifecycleObserver _lifecycleObserver;
 
   @override
   // --- Screen lifecycle: load persisted ideas ---
   void initState() {
     super.initState();
+    _lifecycleObserver = _LifecycleObserver(onPause: _repo.save);
+    WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _repo.load().then((_) {
       if (!mounted) return;
       setState(() {});
@@ -31,6 +34,7 @@ class _IdeaListPageState extends State<IdeaListPage> {
   @override
   // --- Screen lifecycle: dispose controllers ---
   void dispose() {
+    WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -130,5 +134,20 @@ class _IdeaListPageState extends State<IdeaListPage> {
     // --- UX helper: dismiss soft keyboard ---
     _searchFocusNode.unfocus();
     FocusManager.instance.primaryFocus?.unfocus();
+  }
+}
+
+class _LifecycleObserver extends WidgetsBindingObserver {
+  _LifecycleObserver({required this.onPause});
+
+  final Future<void> Function() onPause;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      onPause();
+    }
   }
 }
